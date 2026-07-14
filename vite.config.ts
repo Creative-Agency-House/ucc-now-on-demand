@@ -6,6 +6,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
 export default defineConfig({
+  base: "./",
   plugins: [
     TanStackRouterVite({
       routesDirectory: "./src/routes",
