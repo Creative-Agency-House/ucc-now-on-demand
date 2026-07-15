@@ -29,10 +29,10 @@ function PaywallPage() {
   
   // Checkout Modal State
   const [showCheckout, setShowCheckout] = useState(false);
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("0000 0000 0000 0000");
+  const [expiry, setExpiry] = useState("00/00");
+  const [cvc, setCvc] = useState("000");
+  const [cardName, setCardName] = useState("UCC Member");
 
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +50,7 @@ function PaywallPage() {
       const sub = { active: true, tier: selectedTier };
       localStorage.setItem("graceflix_subscription", JSON.stringify(sub));
       
-      toast.success(`Welcome to GraceFlix! Subscribed to the ${selectedTier === "single" ? "Single User" : "Family"} Plan.`);
+      toast.success(`Welcome to UCC Now On Demand! Subscribed to the ${selectedTier === "single" ? "Single User" : "Family"} Plan.`);
       navigate({ to: "/profiles" });
     }, 2000);
   };
@@ -74,7 +74,7 @@ function PaywallPage() {
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-accent" />
             <span className="text-xl font-black tracking-tighter text-white">
-              GRACE<span className="text-primary">FLIX</span>
+              UCC NOW<span className="text-primary"> ON DEMAND</span>
             </span>
           </div>
           <button 
@@ -88,7 +88,7 @@ function PaywallPage() {
         {/* Content */}
         <div className="my-auto py-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold tracking-tight">Unlock GraceFlix</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight">Unlock UCC Now On Demand</h1>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               Unlock unlimited access to custom study courses, live streams, reflection quizzes, and scripture guides.
             </p>

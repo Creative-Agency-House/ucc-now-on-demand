@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Settings — GraceFlix" }] }),
+  head: () => ({ meta: [{ title: "Settings — UCC Now On Demand" }] }),
   component: SettingsPage,
 });
 

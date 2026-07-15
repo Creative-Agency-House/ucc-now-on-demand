@@ -12,9 +12,9 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "GraceFlix — Stream & Grow" },
+      { title: "UCC Now On Demand" },
       { name: "description", content: "Sermons, courses, study plans, and reflection quizzes — all in one app." },
-      { property: "og:title", content: "GraceFlix" },
+      { property: "og:title", content: "UCC Now On Demand" },
       { property: "og:description", content: "Sermons, courses, study plans, and reflection quizzes — all in one app." },
     ],
   }),
@@ -26,8 +26,8 @@ function Index() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-md min-h-screen flex flex-col px-6 pt-16 pb-10">
         <div className="flex flex-col items-center gap-8">
-          <img src={logo} alt="GraceFlix" width={251} height={220} className="w-56 h-auto" />
-          <h1 className="sr-only">GraceFlix</h1>
+          <img src={logo} alt="UCC Now On Demand" width={251} height={220} className="w-56 h-auto" />
+          <h1 className="sr-only">UCC Now On Demand</h1>
         </div>
 
         <div className="mt-12 text-center">

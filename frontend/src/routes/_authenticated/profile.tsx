@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { VIDEOS, type Video } from "@/lib/videos";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Profile — GraceFlix" }] }),
+  head: () => ({ meta: [{ title: "Profile — UCC Now On Demand" }] }),
   component: ProfilePage,
 });
 

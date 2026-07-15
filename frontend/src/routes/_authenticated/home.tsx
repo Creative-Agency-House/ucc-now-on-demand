@@ -135,7 +135,7 @@ function HomePage() {
           {/* Hero Content */}
           <div className="absolute bottom-6 inset-x-0 px-5 flex flex-col justify-end">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-black tracking-tighter text-white mr-1">GRACE<span className="text-primary">FLIX</span></span>
+              <span className="text-xs font-black tracking-tighter text-white mr-1">UCC NOW<span className="text-primary"> ON DEMAND</span></span>
               <span className="text-[10px] tracking-widest uppercase font-extrabold text-white/70">Featured sermon</span>
             </div>
             
