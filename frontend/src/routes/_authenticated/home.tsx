@@ -25,6 +25,7 @@ function getRating(id: string): string {
 function HomePage() {
   const navigate = useNavigate();
   useQueryClient();
+  const { activeProfile } = Route.useRouteContext() as any;
   const [name, setName] = useState<string>("Friend");
   const [activeTab, setActiveTab] = useState<string>(TABS[0]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -36,6 +37,9 @@ function HomePage() {
   // Curated recommended sermons (different from hero)
   const recommendedVideos = VIDEOS.filter((v) => v.id !== heroVideo.id).slice(0, 4);
 
+  const watchlistKey = activeProfile ? `graceflix_watchlist_${activeProfile.id}` : "ucc_now_saved_videos";
+  const progressKey = activeProfile ? `graceflix_progress_${activeProfile.id}` : "ucc_now_continue_watching";
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const meta = data.user?.user_metadata;
@@ -45,11 +49,11 @@ function HomePage() {
 
     if (typeof window !== "undefined") {
       // Load saved list
-      const saved = localStorage.getItem("ucc_now_saved_videos");
+      const saved = localStorage.getItem(watchlistKey);
       if (saved) setSavedIds(JSON.parse(saved));
 
       // Load continue watching list
-      const continueStr = localStorage.getItem("ucc_now_continue_watching");
+      const continueStr = localStorage.getItem(progressKey);
       let storedList = continueStr ? JSON.parse(continueStr) : [];
       
       // Seed default items if empty so section is visible
@@ -58,7 +62,7 @@ function HomePage() {
           { id: "million-praise", progress: 0.45 },
           { id: "jesus-ministry", progress: 0.72 },
         ];
-        localStorage.setItem("ucc_now_continue_watching", JSON.stringify(storedList));
+        localStorage.setItem(progressKey, JSON.stringify(storedList));
       }
 
       const resolved = storedList
@@ -70,7 +74,7 @@ function HomePage() {
 
       setContinueList(resolved);
     }
-  }, []);
+  }, [watchlistKey, progressKey]);
 
   function handleToggleWatchlist(id: string, e: React.MouseEvent) {
     e.preventDefault();
@@ -84,7 +88,7 @@ function HomePage() {
       toast.success("Saved to Watchlist");
     }
     setSavedIds(list);
-    localStorage.setItem("ucc_now_saved_videos", JSON.stringify(list));
+    localStorage.setItem(watchlistKey, JSON.stringify(list));
   }
 
   // Filter content based on active tab
@@ -131,7 +135,7 @@ function HomePage() {
           {/* Hero Content */}
           <div className="absolute bottom-6 inset-x-0 px-5 flex flex-col justify-end">
             <div className="flex items-center gap-1.5">
-              <img src={logo} alt="UCC NOW" className="h-5 w-auto" />
+              <span className="text-xs font-black tracking-tighter text-white mr-1">GRACE<span className="text-primary">FLIX</span></span>
               <span className="text-[10px] tracking-widest uppercase font-extrabold text-white/70">Featured sermon</span>
             </div>
             

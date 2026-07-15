@@ -44,6 +44,7 @@ function getRating(id: string): string {
 function VideoDetail() {
   const { video } = Route.useLoaderData();
   const navigate = useNavigate();
+  const { activeProfile } = Route.useRouteContext() as any;
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | null>(null);
@@ -57,8 +58,47 @@ function VideoDetail() {
   const [showControls, setShowControls] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
 
+  // Course study mode states
+  const [studyTab, setStudyTab] = useState<"guide" | "scriptures" | "quiz">("guide");
+  const [selectedQuizAnswer, setSelectedQuizAnswer] = useState<string>("");
+  const [reflectionText, setReflectionText] = useState<string>("");
+  const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
+
+  const watchlistKey = activeProfile ? `graceflix_watchlist_${activeProfile.id}` : "ucc_now_saved_videos";
+  const progressKey = activeProfile ? `graceflix_progress_${activeProfile.id}` : "ucc_now_continue_watching";
+
   const related = VIDEOS.filter((v) => v.id !== video.id).slice(0, 4);
   const rating = getRating(video.id);
+
+  // Course Quiz Data based on Video ID
+  const getQuizData = (id: string) => {
+    if (id === "power-time") {
+      return {
+        question: "What is the primary spiritual key to walking in divine authority?",
+        choices: [
+          "A. Intellectual study alone",
+          "B. Yielding to the Holy Spirit and faith",
+          "C. Public recognition",
+          "D. Financial status"
+        ],
+        correctIndex: 1,
+        reflectionPrompt: "Reflect on a situation in your life where you need to step out in faith and apply divine authority. Write down your action steps."
+      };
+    }
+    return {
+      question: "What is the core theme of this teaching?",
+      choices: [
+        "A. Intellectual knowledge of theological concepts",
+        "B. Practical application of scripture in daily life",
+        "C. Isolating yourself from community",
+        "D. None of the above"
+      ],
+      correctIndex: 1,
+      reflectionPrompt: "Write down 2 ways you can share the insights from this message with someone else this week."
+    };
+  };
+
+  const quizData = getQuizData(video.id);
 
   // Reset state when switching videos
   useEffect(() => {
@@ -72,15 +112,29 @@ function VideoDetail() {
     }
 
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ucc_now_saved_videos');
+      const saved = localStorage.getItem(watchlistKey);
       if (saved) {
         const ids = JSON.parse(saved) as string[];
         setIsSaved(ids.includes(video.id));
       } else {
         setIsSaved(false);
       }
+
+      // Load quiz status
+      const quizKey = `graceflix_quiz_${activeProfile?.id || 'demo'}_${video.id}`;
+      const savedQuiz = localStorage.getItem(quizKey);
+      if (savedQuiz) {
+        const q = JSON.parse(savedQuiz);
+        setQuizSubmitted(true);
+        setSelectedQuizAnswer(q.selectedAnswer);
+        setReflectionText(q.reflection);
+      } else {
+        setQuizSubmitted(false);
+        setSelectedQuizAnswer("");
+        setReflectionText("");
+      }
     }
-  }, [video.id]);
+  }, [video.id, watchlistKey, activeProfile?.id]);
 
   // Fullscreen change listeners to auto-pause when exiting fullscreen
   useEffect(() => {
@@ -213,7 +267,7 @@ function VideoDetail() {
 
   function toggleSave() {
     if (typeof window === 'undefined') return;
-    const saved = localStorage.getItem('ucc_now_saved_videos');
+    const saved = localStorage.getItem(watchlistKey);
     let ids = saved ? (JSON.parse(saved) as string[]) : [];
     if (ids.includes(video.id)) {
       ids = ids.filter(id => id !== video.id);
@@ -224,7 +278,7 @@ function VideoDetail() {
       setIsSaved(true);
       toast.success("Saved to Watchlist");
     }
-    localStorage.setItem('ucc_now_saved_videos', JSON.stringify(ids));
+    localStorage.setItem(watchlistKey, JSON.stringify(ids));
   }
 
   function handleDownload() {
@@ -237,6 +291,26 @@ function VideoDetail() {
       toast.success("Link copied to clipboard!");
     }
   }
+
+  const handleQuizSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedQuizAnswer || !reflectionText.trim()) {
+      toast.error("Please answer both questions.");
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      const quizKey = `graceflix_quiz_${activeProfile?.id || 'demo'}_${video.id}`;
+      const response = {
+        completed: true,
+        selectedAnswer: selectedQuizAnswer,
+        reflection: reflectionText.trim(),
+        submittedAt: new Date().toISOString()
+      };
+      localStorage.setItem(quizKey, JSON.stringify(response));
+    }
+    setQuizSubmitted(true);
+    toast.success("Reflection Quiz submitted successfully!");
+  };
 
   return (
     <main className="min-h-screen bg-background text-foreground pb-12">
@@ -266,11 +340,11 @@ function VideoDetail() {
                 setCurrent(cur);
                 if (total > 0 && typeof window !== 'undefined') {
                   const progress = cur / total;
-                  const curWatchStr = localStorage.getItem('ucc_now_continue_watching');
+                  const curWatchStr = localStorage.getItem(progressKey);
                   let curWatch = curWatchStr ? JSON.parse(curWatchStr) : [];
                   curWatch = curWatch.filter((item: any) => item.id !== video.id);
                   curWatch.unshift({ id: video.id, progress });
-                  localStorage.setItem('ucc_now_continue_watching', JSON.stringify(curWatch.slice(0, 5)));
+                  localStorage.setItem(progressKey, JSON.stringify(curWatch.slice(0, 5)));
                 }
               }}
               onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || 0)}
@@ -447,19 +521,182 @@ function VideoDetail() {
           </div>
         </section>
 
-        {/* Description Section */}
-        <section className="px-5 mt-4">
-          <h2 className="text-sm font-extrabold uppercase tracking-widest text-primary">Description</h2>
-          <p className="text-xs text-muted-foreground font-semibold mt-1">{video.category} • {video.duration}</p>
-        </section>
-
-        {/* Overview Section */}
-        <section className="px-5 mt-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-extrabold uppercase tracking-widest text-white/90">Overview</h2>
-            <span className="text-[10px] font-bold text-muted-foreground">Mon, 25 Jun 2026</span>
+        {/* Course Study Mode Tabs */}
+        <section className="px-5 mt-6 border-t border-border/40 pt-6">
+          {/* Tab Header capsules */}
+          <div className="flex bg-card/40 border border-border/50 p-1 rounded-2xl gap-1">
+            <button
+              onClick={() => setStudyTab("guide")}
+              className={`flex-1 py-2 text-center text-[10px] uppercase tracking-wider font-extrabold rounded-xl transition ${
+                studyTab === "guide" ? "bg-primary text-primary-foreground font-black" : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              Study Guide
+            </button>
+            <button
+              onClick={() => setStudyTab("scriptures")}
+              className={`flex-1 py-2 text-center text-[10px] uppercase tracking-wider font-extrabold rounded-xl transition ${
+                studyTab === "scriptures" ? "bg-primary text-primary-foreground font-black" : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              Scriptures
+            </button>
+            <button
+              onClick={() => setStudyTab("quiz")}
+              className={`flex-1 py-2 text-center text-[10px] uppercase tracking-wider font-extrabold rounded-xl transition ${
+                studyTab === "quiz" ? "bg-primary text-primary-foreground font-black" : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              Quiz & Reflection
+            </button>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground font-medium">{video.description} Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam at porttitor sem. Curabitur porta elementum magna ut scelerisque. Curabitur feugiat augue at purus porttitor, id tristique purus porta.</p>
+
+          {/* Tab Content */}
+          <div className="mt-5">
+            {studyTab === "guide" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Lesson Overview</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground font-medium">
+                    {video.description} This course teaching covers key spiritual insights. Review the scripture passages and complete the reflection quiz to reinforce your learning.
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => toast.success("Study PDF downloaded successfully!")} 
+                  className="w-full h-11 bg-card hover:bg-card/80 text-white border border-border/80 flex items-center justify-center gap-2 rounded-xl text-xs font-bold"
+                >
+                  <Download className="h-4 w-4" /> Download Course Study Guide (PDF)
+                </Button>
+              </div>
+            )}
+
+            {studyTab === "scriptures" && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Referenced Scriptures</h3>
+                <ul className="space-y-3">
+                  {video.id === "power-time" ? (
+                    <>
+                      <li className="p-3 bg-card/30 border border-border/50 rounded-xl">
+                        <p className="text-xs font-bold text-accent">Luke 10:19</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground italic font-medium">
+                          "I have given you authority to trample on snakes and scorpions and to overcome all the power of the enemy; nothing will harm you."
+                        </p>
+                      </li>
+                      <li className="p-3 bg-card/30 border border-border/50 rounded-xl">
+                        <p className="text-xs font-bold text-accent">Ephesians 6:12</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground italic font-medium">
+                          "For our struggle is not against flesh and blood, but against the rulers, against the authorities, against the powers of this dark world..."
+                        </p>
+                      </li>
+                    </>
+                  ) : (
+                    <>
+                      <li className="p-3 bg-card/30 border border-border/50 rounded-xl">
+                        <p className="text-xs font-bold text-accent">Romans 8:28</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground italic font-medium">
+                          "And we know that in all things God works for the good of those who love him, who have been called according to his purpose."
+                        </p>
+                      </li>
+                      <li className="p-3 bg-card/30 border border-border/50 rounded-xl">
+                        <p className="text-xs font-bold text-accent">Philippians 4:13</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground italic font-medium">
+                          "I can do all this through him who gives me strength."
+                        </p>
+                      </li>
+                    </>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {studyTab === "quiz" && (
+              <div>
+                {quizSubmitted ? (
+                  <div className="p-5 rounded-2xl border border-primary/25 bg-primary/5 text-center flex flex-col items-center">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
+                      <Check className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white">Quiz Completed!</h3>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Your response has been saved to your viewer profile.
+                    </p>
+
+                    <div className="mt-4 w-full text-left space-y-3 pt-3 border-t border-border/30">
+                      <div>
+                        <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Multiple Choice Answer</p>
+                        <p className="text-xs font-semibold text-white mt-1">{selectedQuizAnswer}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Reflection response</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed font-semibold mt-1 bg-card/30 p-2.5 rounded-xl border border-border/30">
+                          {reflectionText}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setQuizSubmitted(false)}
+                      className="mt-6 text-xs font-bold text-muted-foreground hover:text-white transition uppercase tracking-wider"
+                    >
+                      Edit Response
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleQuizSubmit} className="space-y-5">
+                    {/* Q1 */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-white leading-normal">
+                        Q1: {quizData.question}
+                      </p>
+                      <div className="space-y-2 pt-1">
+                        {quizData.choices.map((c) => (
+                          <label 
+                            key={c}
+                            className={`flex items-center gap-3 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer select-none ${
+                              selectedQuizAnswer === c 
+                                ? "bg-primary/5 border-primary text-white" 
+                                : "bg-card/25 border-border/50 text-muted-foreground hover:text-white hover:border-border"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="q1"
+                              value={c}
+                              checked={selectedQuizAnswer === c}
+                              onChange={(e) => setSelectedQuizAnswer(e.target.value)}
+                              className="accent-primary"
+                            />
+                            <span>{c}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Q2 */}
+                    <div className="space-y-2 pt-2">
+                      <label className="text-xs font-bold text-white leading-normal block">
+                        Q2: {quizData.reflectionPrompt}
+                      </label>
+                      <textarea
+                        required
+                        value={reflectionText}
+                        onChange={(e) => setReflectionText(e.target.value)}
+                        placeholder="Type your reflection here..."
+                        className="w-full min-h-24 p-3 rounded-xl bg-background border border-border text-xs text-white focus:outline-none focus:border-primary leading-relaxed"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full h-11 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/95"
+                    >
+                      Submit Response
+                    </Button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Related Section ("Up Next") */}

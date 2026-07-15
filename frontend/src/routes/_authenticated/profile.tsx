@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, User, Bookmark, Bell, Settings, HelpCircle, LogOut, Shield, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, User, Bookmark, Bell, Settings, HelpCircle, LogOut, Shield, Search, RefreshCw, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { VIDEOS, type Video } from "@/lib/videos";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Profile — UCC Now On Demand" }] }),
+  head: () => ({ meta: [{ title: "Profile — GraceFlix" }] }),
   component: ProfilePage,
 });
 
@@ -21,6 +21,7 @@ function ProfilePage() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("Friend");
+  const [activeProfile, setActiveProfile] = useState<{ id: string; name: string; avatar: string } | null>(null);
 
   // Modal control states
   const [activeModal, setActiveModal] = useState<"edit" | "saved" | "privacy" | "help" | null>(null);
@@ -42,6 +43,7 @@ function ProfilePage() {
   const [supportMessage, setSupportMessage] = useState("");
 
   useEffect(() => {
+    // Load parent user details
     supabase.auth.getUser().then(({ data }) => {
       const u = data.user;
       if (!u) return;
@@ -52,12 +54,21 @@ function ProfilePage() {
       setEditName(displayName);
       setEditEmail(u.email ?? "");
     });
+
+    // Load active sub-profile
+    if (typeof window !== "undefined") {
+      const activeStr = localStorage.getItem("graceflix_active_profile");
+      if (activeStr) {
+        setActiveProfile(JSON.parse(activeStr));
+      }
+    }
   }, []);
 
   // Reload saved videos whenever the saved videos modal is triggered
   useEffect(() => {
     if (activeModal === "saved" && typeof window !== "undefined") {
-      const savedIdsStr = localStorage.getItem("ucc_now_saved_videos");
+      const key = activeProfile ? `graceflix_watchlist_${activeProfile.id}` : "ucc_now_saved_videos";
+      const savedIdsStr = localStorage.getItem(key);
       if (savedIdsStr) {
         const ids = JSON.parse(savedIdsStr) as string[];
         const filtered = VIDEOS.filter((v) => ids.includes(v.id));
@@ -66,14 +77,22 @@ function ProfilePage() {
         setSavedVideos([]);
       }
     }
-  }, [activeModal]);
+  }, [activeModal, activeProfile]);
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
+    // Clear active profile on sign out
+    localStorage.removeItem("graceflix_active_profile");
     toast.success("Signed out");
     navigate({ to: "/auth", replace: true });
+  }
+
+  function handleSwitchProfile() {
+    localStorage.removeItem("graceflix_active_profile");
+    toast.success("Logging out of profile...");
+    navigate({ to: "/profiles" });
   }
 
   // Update profile handler
@@ -110,9 +129,10 @@ function ProfilePage() {
 
   function handleClearHistory() {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("ucc_now_saved_videos");
+      const key = activeProfile ? `graceflix_watchlist_${activeProfile.id}` : "ucc_now_saved_videos";
+      localStorage.removeItem(key);
       setSavedVideos([]);
-      toast.success("Saved watchlist and watch history cleared!");
+      toast.success("Watchlist cleared!");
     }
   }
 
@@ -128,9 +148,11 @@ function ProfilePage() {
     {
       title: "Account",
       items: [
-        { icon: User, label: "Edit profile", onClick: () => { setEditName(name); setEditEmail(email); setActiveModal("edit"); } },
-        { icon: Bookmark, label: "Saved videos", onClick: () => setActiveModal("saved") },
+        { icon: User, label: "Edit parent account", onClick: () => { setEditName(name); setEditEmail(email); setActiveModal("edit"); } },
+        { icon: Bookmark, label: "Saved watchlist", onClick: () => setActiveModal("saved") },
         { icon: Bell, label: "Notifications", to: "/notifications" },
+        { icon: RefreshCw, label: "Switch profile", onClick: handleSwitchProfile },
+        { icon: CreditCard, label: "Manage subscription", to: "/paywall" },
       ],
     },
     {
@@ -168,12 +190,12 @@ function ProfilePage() {
 
         {/* Profile Details card */}
         <section className="px-5 mt-2 flex items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center text-2xl font-extrabold shadow-[var(--shadow-glow)]">
-            {name.charAt(0).toUpperCase()}
+          <div className={`h-16 w-16 rounded-full ${activeProfile?.avatar || "bg-gradient-to-br from-primary to-accent"} text-white flex items-center justify-center text-2xl font-extrabold shadow-lg`}>
+            {activeProfile ? activeProfile.name.charAt(0).toUpperCase() : name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-lg font-bold truncate">{name}</p>
-            <p className="text-xs text-muted-foreground truncate">{email}</p>
+            <p className="text-lg font-bold truncate">{activeProfile ? activeProfile.name : name}</p>
+            <p className="text-xs text-muted-foreground truncate">{activeProfile ? `Viewer Profile • ${name}` : email}</p>
           </div>
         </section>
 

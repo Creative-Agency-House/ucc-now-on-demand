@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Settings — UCC Now On Demand" }] }),
+  head: () => ({ meta: [{ title: "Settings — GraceFlix" }] }),
   component: SettingsPage,
 });
 
@@ -56,7 +56,7 @@ function SettingsPage() {
           </li>
         </ul>
 
-        <p className="px-5 mt-6 text-[11px] text-muted-foreground/70 text-center">UCC Now On Demand · v1.0.0</p>
+        <p className="px-5 mt-6 text-[11px] text-muted-foreground/70 text-center">GraceFlix · v1.0.0</p>
       </div>
     </main>
   );

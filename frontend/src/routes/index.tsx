@@ -1,14 +1,21 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/uccnow-logo.png";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      throw redirect({ to: "/home" });
+    }
+  },
   head: () => ({
     meta: [
-      { title: "UCC Now On Demand — Worship Anywhere" },
-      { name: "description", content: "Stream sermons, join live services, view events, and give — all in one app." },
-      { property: "og:title", content: "UCC Now On Demand" },
-      { property: "og:description", content: "Stream sermons, join live services, view events, and give — all in one app." },
+      { title: "GraceFlix — Stream & Grow" },
+      { name: "description", content: "Sermons, courses, study plans, and reflection quizzes — all in one app." },
+      { property: "og:title", content: "GraceFlix" },
+      { property: "og:description", content: "Sermons, courses, study plans, and reflection quizzes — all in one app." },
     ],
   }),
   component: Index,
@@ -19,8 +26,8 @@ function Index() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-md min-h-screen flex flex-col px-6 pt-16 pb-10">
         <div className="flex flex-col items-center gap-8">
-          <img src={logo} alt="UCC NOW On Demand" width={251} height={220} className="w-56 h-auto" />
-          <h1 className="sr-only">UCC NOW On Demand</h1>
+          <img src={logo} alt="GraceFlix" width={251} height={220} className="w-56 h-auto" />
+          <h1 className="sr-only">GraceFlix</h1>
         </div>
 
         <div className="mt-12 text-center">
@@ -30,7 +37,7 @@ function Index() {
             <span>Grow.</span>
           </h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Sermons, podcasts, and inspiration from Apostle Dr. Emmanuel Osei-Acheampong, anytime.
+            Sermons, courses, and spiritual teachings in a premium streaming experience.
           </p>
         </div>
 
