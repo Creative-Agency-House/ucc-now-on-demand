@@ -6,6 +6,4 @@ infrastructure/cdk.out/
 frontend/.vite/
 dist/
 frontend/dist/
-public/videos/
-frontend/public/videos/
 *.log
