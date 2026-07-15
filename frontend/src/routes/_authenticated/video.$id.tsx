@@ -82,6 +82,49 @@ function VideoDetail() {
     }
   }, [video.id]);
 
+  // Fullscreen change listeners to auto-pause when exiting fullscreen
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    
+    function onExitFullscreen() {
+      const isFs = document.fullscreenElement || (document as any).webkitFullscreenElement;
+      if (!isFs) {
+        setPlaying(false);
+        if (videoEl) {
+          videoEl.pause();
+        }
+      }
+    }
+
+    document.addEventListener("fullscreenchange", onExitFullscreen);
+    document.addEventListener("webkitfullscreenchange", onExitFullscreen);
+    if (videoEl) {
+      videoEl.addEventListener("webkitendfullscreen", onExitFullscreen);
+    }
+
+    return () => {
+      document.removeEventListener("fullscreenchange", onExitFullscreen);
+      document.removeEventListener("webkitfullscreenchange", onExitFullscreen);
+      if (videoEl) {
+        videoEl.removeEventListener("webkitendfullscreen", onExitFullscreen);
+      }
+    };
+  }, []);
+
+  // Exit fullscreen when playing is set to false (e.g. Back button clicked inside video player overlay)
+  useEffect(() => {
+    if (!playing) {
+      const isFs = document.fullscreenElement || (document as any).webkitFullscreenElement;
+      if (isFs) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if ((document as any).webkitExitFullscreen) {
+          (document as any).webkitExitFullscreen();
+        }
+      }
+    }
+  }, [playing]);
+
   function scheduleHide() {
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setShowControls(false), 2800);
@@ -124,10 +167,47 @@ function VideoDetail() {
   async function toggleFullscreen() {
     const el = wrapRef.current;
     if (!el) return;
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else if (el.requestFullscreen) {
-      await el.requestFullscreen();
+    if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
+    } else {
+      if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      } else if ((el as any).webkitRequestFullscreen) {
+        await (el as any).webkitRequestFullscreen();
+      }
+    }
+  }
+
+  async function handlePlayClick() {
+    setPlaying(true);
+    const wrap = wrapRef.current;
+    const videoElement = videoRef.current;
+    
+    if (videoElement) {
+      try {
+        await videoElement.play();
+      } catch (e) {
+        console.warn("Play request failed:", e);
+      }
+    }
+
+    if (wrap) {
+      try {
+        if (wrap.requestFullscreen) {
+          await wrap.requestFullscreen();
+        } else if ((wrap as any).webkitRequestFullscreen) {
+          await (wrap as any).webkitRequestFullscreen();
+        } else if (videoElement && (videoElement as any).webkitEnterFullscreen) {
+          // iOS Safari fallback
+          await (videoElement as any).webkitEnterFullscreen();
+        }
+      } catch (e) {
+        console.warn("Fullscreen request blocked:", e);
+      }
     }
   }
 
@@ -164,154 +244,151 @@ function VideoDetail() {
         
         {/* Top Poster / Player Container */}
         <div className="relative w-full aspect-[4/5] bg-black overflow-hidden z-0">
-          {playing ? (
-            // Active HTML5 video stream player
+          {/* Active HTML5 video stream player */}
+          <div
+            ref={wrapRef}
+            className={`relative w-full h-full select-none ${playing ? "block" : "hidden"}`}
+            onMouseMove={reveal}
+            onClick={reveal}
+          >
+            <video
+              ref={videoRef}
+              src={video.videoUrl}
+              poster={video.img}
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 h-full w-full object-contain bg-black"
+              onClick={togglePlay}
+              onPlay={() => { setPlaying(true); scheduleHide(); }}
+              onPause={() => { setPlaying(false); setShowControls(true); }}
+              onTimeUpdate={(e) => {
+                const cur = e.currentTarget.currentTime;
+                setCurrent(cur);
+                if (total > 0 && typeof window !== 'undefined') {
+                  const progress = cur / total;
+                  const curWatchStr = localStorage.getItem('ucc_now_continue_watching');
+                  let curWatch = curWatchStr ? JSON.parse(curWatchStr) : [];
+                  curWatch = curWatch.filter((item: any) => item.id !== video.id);
+                  curWatch.unshift({ id: video.id, progress });
+                  localStorage.setItem('ucc_now_continue_watching', JSON.stringify(curWatch.slice(0, 5)));
+                }
+              }}
+              onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || 0)}
+              onDurationChange={(e) => setTotal(e.currentTarget.duration || 0)}
+              onWaiting={() => setBuffering(true)}
+              onPlaying={() => setBuffering(false)}
+              onCanPlay={() => setBuffering(false)}
+              onEnded={() => { setPlaying(false); setShowControls(true); }}
+              onError={() => { setError("Couldn't load this stream."); setBuffering(false); }}
+            />
+
+            {/* Player Top back action */}
             <div
-              ref={wrapRef}
-              className="relative w-full h-full select-none"
-              onMouseMove={reveal}
-              onClick={reveal}
+              className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
+                showControls ? "opacity-100" : "opacity-0"
+              }`}
+            />
+            <button
+              onClick={(e) => { e.stopPropagation(); setPlaying(false); }}
+              className={`absolute top-3 left-3 h-9 w-9 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center transition-opacity ${
+                showControls ? "opacity-100" : "opacity-0"
+              }`}
+              aria-label="Stop Player"
             >
-              <video
-                ref={videoRef}
-                src={video.videoUrl}
-                poster={video.img}
-                playsInline
-                autoPlay
-                preload="metadata"
-                className="absolute inset-0 h-full w-full object-contain bg-black"
-                onClick={togglePlay}
-                onPlay={() => { setPlaying(true); scheduleHide(); }}
-                onPause={() => { setPlaying(false); setShowControls(true); }}
-                onTimeUpdate={(e) => {
-                  const cur = e.currentTarget.currentTime;
-                  setCurrent(cur);
-                  if (total > 0 && typeof window !== 'undefined') {
-                    const progress = cur / total;
-                    const curWatchStr = localStorage.getItem('ucc_now_continue_watching');
-                    let curWatch = curWatchStr ? JSON.parse(curWatchStr) : [];
-                    curWatch = curWatch.filter((item: any) => item.id !== video.id);
-                    curWatch.unshift({ id: video.id, progress });
-                    localStorage.setItem('ucc_now_continue_watching', JSON.stringify(curWatch.slice(0, 5)));
-                  }
-                }}
-                onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || 0)}
-                onDurationChange={(e) => setTotal(e.currentTarget.duration || 0)}
-                onWaiting={() => setBuffering(true)}
-                onPlaying={() => setBuffering(false)}
-                onCanPlay={() => setBuffering(false)}
-                onEnded={() => { setPlaying(false); setShowControls(true); }}
-                onError={() => { setError("Couldn't load this stream."); setBuffering(false); }}
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+
+            {/* Loader */}
+            {buffering && !error && (
+              <div className="absolute inset-0 m-auto h-12 w-12 flex items-center justify-center text-white">
+                <Loader2 className="h-10 w-10 animate-spin" />
+              </div>
+            )}
+
+            {/* Error fallback */}
+            {error && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-sm gap-2 px-6 text-center bg-black/60">
+                <p>{error}</p>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setError(null); videoRef.current?.load(); }}
+                  className="mt-1 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-bold"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Player controls */}
+            <div
+              className={`absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
+                showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="range"
+                min={0}
+                max={1000}
+                value={total ? (current / total) * 1000 : 0}
+                onChange={seek}
+                aria-label="Seek"
+                className="w-full h-1 accent-primary cursor-pointer"
               />
-
-              {/* Player Top back action */}
-              <div
-                className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
-                  showControls ? "opacity-100" : "opacity-0"
-                }`}
-              />
-              <button
-                onClick={(e) => { e.stopPropagation(); setPlaying(false); }}
-                className={`absolute top-3 left-3 h-9 w-9 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center transition-opacity ${
-                  showControls ? "opacity-100" : "opacity-0"
-                }`}
-                aria-label="Stop Player"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-
-              {/* Loader */}
-              {buffering && !error && (
-                <div className="absolute inset-0 m-auto h-12 w-12 flex items-center justify-center text-white">
-                  <Loader2 className="h-10 w-10 animate-spin" />
-                </div>
-              )}
-
-              {/* Error fallback */}
-              {error && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-sm gap-2 px-6 text-center bg-black/60">
-                  <p>{error}</p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setError(null); videoRef.current?.load(); }}
-                    className="mt-1 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-bold"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {/* Player controls */}
-              <div
-                className={`absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
-                  showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-                }`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="range"
-                  min={0}
-                  max={1000}
-                  value={total ? (current / total) * 1000 : 0}
-                  onChange={seek}
-                  aria-label="Seek"
-                  className="w-full h-1 accent-primary cursor-pointer"
-                />
-                <div className="mt-1 flex items-center gap-3 text-white text-xs">
-                  <button onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
-                    {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
-                  </button>
-                  <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}>
-                    {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-                  </button>
-                  <span className="font-medium tabular-nums">
-                    {fmt(current)} <span className="text-white/60">/ {fmt(total)}</span>
-                  </span>
-                  <div className="flex-1" />
-                  <button onClick={toggleFullscreen} aria-label="Fullscreen">
-                    <Maximize className="h-5 w-5" />
-                  </button>
-                </div>
+              <div className="mt-1 flex items-center gap-3 text-white text-xs">
+                <button onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+                  {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
+                </button>
+                <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}>
+                  {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </button>
+                <span className="font-medium tabular-nums">
+                  {fmt(current)} <span className="text-white/60">/ {fmt(total)}</span>
+                </span>
+                <div className="flex-1" />
+                <button onClick={toggleFullscreen} aria-label="Fullscreen">
+                  <Maximize className="h-5 w-5" />
+                </button>
               </div>
             </div>
-          ) : (
-            // Tall poster display with glassy play button overlay
-            <>
-              <img
-                src={video.img}
-                alt={video.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-black/10 to-black/45" />
+          </div>
 
-              {/* Header icons */}
-              <button
-                onClick={() => navigate({ to: "/home" })}
-                className="absolute top-4 left-4 h-10 w-10 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center border border-white/10 hover:bg-black/60 transition"
-                aria-label="Back"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
+          {/* Tall poster display with glassy play button overlay */}
+          <div className={`relative w-full h-full ${playing ? "hidden" : "block"}`}>
+            <img
+              src={video.img}
+              alt={video.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-black/10 to-black/45" />
 
-              <button
-                onClick={toggleSave}
-                className={`absolute top-4 right-4 h-10 w-10 rounded-full backdrop-blur-md flex items-center justify-center border transition ${
-                  isSaved ? "bg-primary/95 text-white border-primary/20" : "bg-black/40 text-white/90 border-white/10"
-                }`}
-                aria-label="Save watchlist"
-              >
-                <Heart className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />
-              </button>
+            {/* Header icons */}
+            <button
+              onClick={() => navigate({ to: "/home" })}
+              className="absolute top-4 left-4 h-10 w-10 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center border border-white/10 hover:bg-black/60 transition"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
 
-              {/* Central Glassmorphic play button */}
-              <button
-                onClick={() => setPlaying(true)}
-                className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-2xl hover:scale-105 hover:bg-white/25 transition cursor-pointer"
-                aria-label="Play video"
-              >
-                <Play className="h-9 w-9 fill-current ml-1" />
-              </button>
-            </>
-          )}
+            <button
+              onClick={toggleSave}
+              className={`absolute top-4 right-4 h-10 w-10 rounded-full backdrop-blur-md flex items-center justify-center border transition ${
+                isSaved ? "bg-primary/95 text-white border-primary/20" : "bg-black/40 text-white/90 border-white/10"
+              }`}
+              aria-label="Save watchlist"
+            >
+              <Heart className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />
+            </button>
+
+            {/* Central Glassmorphic play button */}
+            <button
+              onClick={handlePlayClick}
+              className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-2xl hover:scale-105 hover:bg-white/25 transition cursor-pointer"
+              aria-label="Play video"
+            >
+              <Play className="h-9 w-9 fill-current ml-1" />
+            </button>
+          </div>
         </div>
 
         {/* Title Details Card container */}
