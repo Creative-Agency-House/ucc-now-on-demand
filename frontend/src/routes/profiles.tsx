@@ -17,7 +17,12 @@ export const Route = createFileRoute("/profiles")({
     if (!sub || !sub.active) {
       throw redirect({ to: "/paywall" });
     }
-    return { user: data.user, subscription: sub };
+  },
+  loader: async () => {
+    const { data } = await supabase.auth.getUser();
+    const subStr = typeof window !== "undefined" ? localStorage.getItem("graceflix_subscription") : null;
+    const sub = subStr ? JSON.parse(subStr) : null;
+    return { user: data.user!, subscription: sub };
   },
   component: ProfilesPage,
 });
