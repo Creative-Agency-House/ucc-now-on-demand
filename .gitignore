@@ -1,0 +1,11 @@
+node_modules/
+frontend/node_modules/
+infrastructure/node_modules/
+infrastructure/cdk.out/
+.vite/
+frontend/.vite/
+dist/
+frontend/dist/
+public/videos/
+frontend/public/videos/
+*.log
